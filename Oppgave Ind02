@@ -1,0 +1,87 @@
+
+# Oppgave Ind02
+
+
+# Inkluderer biblioteker
+include shared-gdrive(
+             "dcic-2021",
+             "1wyQZj_L0qqV9Ekgr9au6RX2iqt2Ga8Ep")
+
+include gdrive-sheets
+include shared-gdrive("dcic-2021", "1wyQZj_L0qqV9Ekgr9au6RX2iqt2Ga8Ep")
+include data-source
+       ssid = "1RYN0i4Zx_UETVuYacgaGfnFcv4l9zd9toQTTdkQkj7g"
+
+
+
+# a) 
+
+# Definerer tabellen som en variabel og bruker sanitize-funksjonen til å bekrefte cellens verdi
+ETNTransform = load-table: komponent, energi
+  source: load-spreadsheet(ssid).sheet-by-name("kWh", true)
+  sanitize komponent using string-sanitizer
+  sanitize energi using string-sanitizer 
+end
+
+
+
+# b)
+
+# Variabler som faktorer i formelen "energy-per-day"
+distance-travelled-per-day = 30
+
+distance-per-unit-of-fuel = 10
+
+energy-per-unit-of-fuel = 10
+
+energy-per-day = num-round(distance-travelled-per-day / 
+  distance-per-unit-of-fuel) * energy-per-unit-of-fuel
+
+
+# Funksjonen sjekker at parameteret "str (string)" inneholder en verdi, ellers returner none => energy-per-day formelen
+fun energi-to-number(str :: String) -> Number:
+  cases(Option) string-to-number(str):
+    | some(a) => a
+    | none => energy-per-day
+  end
+  
+  where:
+  energi-to-number("") is energy-per-day
+  energi-to-number("48") is 48
+       end
+
+
+
+# c)
+
+# Transformerer tabellens "energi"-kolonne til å inneholde "energi-to-number"-funksjonen, som vist over
+# Definerer videre transformeringen som en variabel i form av ETNTransformC
+ETNTransformC = transform-column(
+  ETNTransform, "energi",
+  energi-to-number)
+
+
+# d)
+
+# Summerer kolonnene ETNTransformC og "energi", og lagrer summen i en ny variabel
+KolonneSummert = sum(ETNTransformC, "energi")
+
+# EnergiSummert representerer en ny rad i en tabell, som da inneholder "Sum energiforbruk" med summen i KolonneSummert 
+EnergiSummert = table: komponent :: String, energi :: Number
+  row: "Sum energiforbruk", KolonneSummert
+end
+
+# Vi henter denne raden med get-row-funksjonen, før vi legger til denne raden i vår opprinnelige tabell (ETNTable)
+ETNTable = get-row(EnergiSummert, 0)
+add-row(ETNTransformC, ETNTable)
+
+
+# e)
+
+# Bruker bar-chart for å danne et diagram som visualiserer "komponent" og "energi" i tabellen
+# Ettersom funksjonen allerede basereres på vår nye tabell (som inkluderer "energi-to-number"-funksjonen"), vil det riktige energiforbruket til bil bli vist i visualiseringen
+ETNChart = bar-chart(ETNTransformC, "komponent", "energi")
+
+# Vi kaller på diagrammet
+ETNChart
+
